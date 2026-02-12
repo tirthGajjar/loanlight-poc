@@ -1,0 +1,72 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# database
+/prisma/db.sqlite
+/prisma/db.sqlite-journal
+*.sqlite
+*.sqlite-journal
+
+# react-email
+.react-email/
+
+# next.js
+.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+/dist
+
+# generated files (Prisma client, etc.)
+/generated/
+
+# misc
+.DS_Store
+**/.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+# do not commit any .env files to git, except for the .env.example file
+.env
+.env*.local
+!.env.example
+!.env.vercel.example
+!.env.trigger.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# editor/IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# lock files (optional - uncomment if you want to ignore)
+# pnpm-lock.yaml
+# package-lock.json
+# yarn.lock

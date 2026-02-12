@@ -1,0 +1,17 @@
+# OS files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node modules (if any at root level)
+node_modules/
+
+# Context folder (local reference docs, not part of codebase)
+context/

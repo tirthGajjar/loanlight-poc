@@ -1,0 +1,328 @@
+// Prisma schema for Better Auth
+// learn more: https://better-auth.com/docs/concepts/database
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+// NOTE: When using mysql or sqlserver, uncomment the //@db.Text annotations in model Account below
+// Further reading:
+// https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id
+  name          String //@db.Text
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String? //@db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  role          String    @default("user")
+  banned        Boolean   @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+  loans         Loan[]
+
+  // Classification jobs created by this user
+  classificationJobs ClassificationJob[]
+
+  // Category definition versions
+  createdVersions   CategoryDefinitionVersion[] @relation("VersionCreatedBy")
+  publishedVersions CategoryDefinitionVersion[] @relation("VersionPublishedBy")
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Loan {
+  id              String   @id @default(cuid())
+  loanNumber      String
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  borrowerName    String?
+  propertyAddress String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  classificationJobs ClassificationJob[]
+
+  @@unique([userId, loanNumber])
+  @@index([userId])
+  @@map("loans")
+}
+
+// ============================================================================
+// DOCUMENT CLASSIFICATION MODELS
+// ============================================================================
+
+/// Represents a document classification job for processing consolidated PDFs
+model ClassificationJob {
+  id        String   @id @default(cuid())
+
+  loanId    String
+  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  // Optional user association (for tracking who initiated)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Source file information
+  sourceFileKey   String   /// S3 key: uploads/{loanId}/{jobId}/{filename}
+  sourceFileName  String   /// Original filename
+  sourceSizeBytes Int?     /// File size in bytes
+  totalPages      Int?     /// Total pages in the PDF (set after ingestion)
+
+  // Job status lifecycle: pending → ingesting → splitting → classifying → finalizing → completed | failed
+  status          JobStatus @default(PENDING)
+
+  // Trigger.dev run tracking
+  triggerRunId    String?   /// Root trigger run ID for realtime updates
+
+  // Timing
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime? /// When processing began
+  completedAt     DateTime? /// When processing finished (success or failure)
+
+  // Error handling
+  errorMessage    String?   /// Error details if status is FAILED
+  errorCode       String?   /// Machine-readable error code
+  retryCount      Int       @default(0)
+
+  // Processing metadata (stored as JSON for flexibility)
+  metadata        Json?     /// Additional metadata (e.g., processing options, source info)
+
+  // Category definition version used for this job
+  definitionVersionId String?
+  definitionVersion   CategoryDefinitionVersion? @relation(fields: [definitionVersionId], references: [id])
+
+  // Relations
+  segments        ClassificationSegment[]
+
+  @@index([status])
+  @@index([loanId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("classification_jobs")
+}
+
+/// Represents a single document segment within a classification job
+model ClassificationSegment {
+  id        String            @id @default(cuid())
+  jobId     String
+  job       ClassificationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Segment ordering (1-based index within the job)
+  segmentIndex    Int
+
+  // Page range (1-based, inclusive)
+  pageStart       Int
+  pageEnd         Int
+
+  // Stage 1: Bucket classification (from LlamaSplit)
+  bucket          DocumentBucket?
+  bucketConfidence Float?
+
+  // Stage 2: Subtype classification (from LlamaClassify)
+  subtype         String?   /// e.g., "w2", "paystub", "bank_statement_personal"
+  confidence      Float?    /// 0.0 to 1.0
+  reasoning       String?   /// LLM explanation for the classification
+
+  // Segment status: pending → classifying → completed | failed
+  status          SegmentStatus @default(PENDING)
+
+  // Review flags
+  requiresReview      Boolean   @default(false) /// True if confidence < threshold
+  confidenceLevel     ConfidenceLevel? /// high, medium, low based on thresholds
+
+  // Manual correction tracking
+  manuallyClassified  Boolean   @default(false)
+  classifiedBy        String?   /// User ID who made manual correction
+  classifiedAt        DateTime? /// When manual classification was made
+  originalBucket      DocumentBucket? /// Original bucket before manual override
+  originalSubtype     String?   /// Original subtype before manual override
+
+  // Output file information
+  outputFileKey       String?   /// S3 key: outputs/{loanId}/{jobId}/{filename}
+  suggestedFilename   String?   /// e.g., "001_W2.pdf"
+
+  // Encompass integration
+  encompassFolder     String?   /// Suggested Encompass e-folder path
+
+  // Trigger.dev run tracking
+  triggerRunId        String?
+
+  // Timing
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  classificationStartedAt DateTime?
+  classificationCompletedAt DateTime?
+
+  // Error handling (for segment-level failures)
+  errorMessage        String?
+  errorCode           String?
+
+  @@unique([jobId, segmentIndex])
+  @@index([jobId])
+  @@index([status])
+  @@index([bucket])
+  @@index([requiresReview])
+  @@map("classification_segments")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum JobStatus {
+  PENDING      /// Job created, waiting to start
+  INGESTING    /// Validating file, getting page count
+  SPLITTING    /// Running LlamaSplit to identify document boundaries
+  CLASSIFYING  /// Running LlamaClassify on each segment
+  FINALIZING   /// Extracting individual PDFs, uploading to S3
+  COMPLETED    /// Successfully finished
+  FAILED       /// Processing failed
+  CANCELLED    /// Cancelled by user
+}
+
+enum SegmentStatus {
+  PENDING      /// Waiting for classification
+  CLASSIFYING  /// LlamaClassify in progress
+  COMPLETED    /// Successfully classified
+  FAILED       /// Classification failed
+}
+
+enum DocumentBucket {
+  INCOME       /// W-2s, paystubs, VOEs, 1099s, P&L statements
+  ASSETS       /// Bank statements, brokerage statements, gift letters
+  TAX_RETURNS  /// 1040 tax returns, schedules, K-1s
+  PROPERTY     /// Insurance, deeds, purchase contracts, trusts
+  CREDIT       /// Credit reports, mortgage statements, LOEs, payoffs
+  IDENTITY     /// Driver's license, passport, SSN card
+  DISCLOSURES  /// Closing Disclosure, Loan Estimate, regulatory notices
+  BUSINESS     /// Articles of incorporation, business licenses
+  APPRAISAL    /// Appraisals, desk reviews, AIR certs, ROV disclosures
+  TITLE        /// Title commitments, preliminary reports, CPLs, surveys
+  APPLICATION  /// URLA 1003, 1008 Transmittal, 4506 forms
+  FRAUD        /// DRIVE reports, Lexis Nexis, compliance reports
+  UNKNOWN      /// Cannot classify with confidence
+}
+
+enum ConfidenceLevel {
+  HIGH    /// >= 0.85 - Auto-classified
+  MEDIUM  /// 0.60 - 0.84 - Classified but flagged for review
+  LOW     /// < 0.60 - Requires manual review
+}
+
+enum DefinitionVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================================================
+// CATEGORY DEFINITION VERSIONING
+// ============================================================================
+
+/// Versioned container for category definitions — only one PUBLISHED at a time
+model CategoryDefinitionVersion {
+  id          String                  @id @default(cuid())
+  version     Int                     @unique @default(autoincrement())
+  status      DefinitionVersionStatus @default(DRAFT)
+  createdAt   DateTime                @default(now())
+  publishedAt DateTime?
+
+  createdById   String
+  createdBy     User    @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  publishedById String?
+  publishedBy   User?   @relation("VersionPublishedBy", fields: [publishedById], references: [id])
+
+  categories CategoryDefinition[]
+  jobs       ClassificationJob[]
+
+  @@index([status])
+  @@map("category_definition_versions")
+}
+
+/// Stage 1 category sent to LlamaSplit
+model CategoryDefinition {
+  id          String                    @id @default(cuid())
+  versionId   String
+  version     CategoryDefinitionVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  sortOrder   Int
+
+  subtypes SubtypeDefinition[]
+
+  @@unique([versionId, name])
+  @@index([versionId])
+  @@map("category_definitions")
+}
+
+/// Stage 2 subtype rule with Encompass folder mapping
+model SubtypeDefinition {
+  id              String             @id @default(cuid())
+  categoryId      String
+  category        CategoryDefinition @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  type            String
+  description     String
+  encompassFolder String
+  sortOrder       Int
+
+  @@unique([categoryId, type])
+  @@index([categoryId])
+  @@map("subtype_definitions")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String? //@db.Text
+  userAgent String? //@db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String //@db.Text
+  providerId            String //@db.Text
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String? //@db.Text
+  refreshToken          String? //@db.Text
+  idToken               String? //@db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String? //@db.Text
+  password              String? //@db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String //@db.Text
+  value      String //@db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}

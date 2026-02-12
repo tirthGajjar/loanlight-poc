@@ -1,0 +1,196 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"root": true,
+	"files": {
+		"includes": ["**", "!generated", "!node_modules", "!.next", "!**/*.min.js"]
+	},
+	"vcs": {
+		"enabled": true,
+		"useIgnoreFile": true,
+		"clientKind": "git"
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"recommended": true,
+			"source": {
+				"recommended": true,
+				"organizeImports": "on",
+				"useSortedAttributes": "on"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": true
+	},
+	"linter": {
+		"enabled": true,
+		// Enable domain-specific rules for frameworks
+		"domains": {
+			// Next.js rules (noImgElement, noHeadElement, etc.)
+			"next": "all",
+			// React rules
+			"react": "all"
+		},
+		"rules": {
+			"recommended": true,
+			// Complexity rules for maintainability
+			"complexity": {
+				// Cognitive complexity - keeps functions understandable
+				"noExcessiveCognitiveComplexity": {
+					"level": "warn",
+					"options": {
+						"maxAllowedComplexity": 15
+					}
+				},
+				// Disabled — shadcn compound components often exceed 50 lines
+				"noExcessiveLinesPerFunction": "off",
+				// Prevent excessive nesting in test suites (max 5 levels)
+				"noExcessiveNestedTestSuites": "warn",
+				// Simplify logic expressions
+				"useSimplifiedLogicExpression": "warn",
+				// Flat config arrays
+				"useFlatMap": "warn"
+			},
+			// Nursery rules (experimental but useful)
+			"nursery": {
+				// Disabled — shadcn compound components and CSS files exceed reasonable limits
+				"noExcessiveLinesPerFile": "off",
+				// Sorted tailwind classes
+				"useSortedClasses": {
+					"level": "warn",
+					"fix": "safe",
+					"options": {
+						"functions": ["clsx", "cva", "cn"]
+					}
+				}
+			},
+			// Style rules for consistency
+			"style": {
+				// Disabled — shadcn exports variants alongside components, Next.js exports metadata from layouts
+				"useComponentExportOnlyModules": "off",
+				// Prefer const over let when variable is never reassigned
+				"useConst": "warn",
+				// Use template literals instead of string concatenation
+				"useTemplate": "warn",
+				// Consistent naming convention
+				"useNamingConvention": {
+					"level": "warn",
+					"options": {
+						"strictCase": false,
+						"conventions": [
+							{
+								"selector": { "kind": "function" },
+								"formats": ["camelCase", "PascalCase"]
+							},
+							{
+								"selector": { "kind": "variable" },
+								"formats": ["camelCase", "PascalCase", "CONSTANT_CASE"]
+							},
+							{
+								"selector": { "kind": "typeLike" },
+								"formats": ["PascalCase"]
+							},
+							{
+								"selector": { "kind": "objectLiteralProperty" },
+								"formats": [
+									"camelCase",
+									"PascalCase",
+									"CONSTANT_CASE",
+									"snake_case"
+								]
+							}
+						]
+					}
+				}
+			},
+			// Suspicious code patterns
+			"suspicious": {
+				// No empty block statements
+				"noEmptyBlockStatements": "warn",
+				// No duplicate case labels
+				"noDuplicateCase": "error",
+				// Disabled — shadcn sidebar uses document.cookie for state persistence
+				"noDocumentCookie": "off"
+			},
+			// Performance rules
+			"performance": {
+				// Avoid accumulating spread in loops
+				"noAccumulatingSpread": "warn",
+				// Use Date.now() instead of new Date().getTime()
+				"useTopLevelRegex": "warn"
+			},
+			// React, Next.js and correctness rules
+			"correctness": {
+				// Enforce hooks are called at top level
+				"useHookAtTopLevel": "error",
+				// Enforce proper dependencies in useEffect, useCallback, useMemo
+				// Configured for React Query / tRPC hooks
+				"useExhaustiveDependencies": {
+					"level": "warn",
+					"options": {
+						"hooks": [
+							// React Query hooks - return stable references
+							{ "name": "useQuery", "stableResult": [1] },
+							{ "name": "useMutation", "stableResult": true },
+							{ "name": "useInfiniteQuery", "stableResult": [1] },
+							{ "name": "useSuspenseQuery", "stableResult": [1] },
+							// tRPC hooks - return stable references
+							{ "name": "useUtils", "stableResult": true }
+						]
+					}
+				},
+				// Require key prop in iterables
+				"useJsxKeyInIterable": "error",
+				// Don't pass children as a prop (React)
+				"noChildrenProp": "error"
+			},
+			// Accessibility rules
+			"a11y": {
+				// Disabled — reusable Label component receives htmlFor via spread props
+				"noLabelWithoutControl": "off",
+				// Disabled — false positive with base-ui render prop pattern
+				"useAnchorContent": "off",
+				// Ensure buttons have explicit type
+				"useButtonType": "error",
+				// Disabled — role="group" is intentional in shadcn, not meant to be <fieldset>
+				"useSemanticElements": "off",
+				// Require alt text on images
+				"useAltText": "error",
+				// Require valid anchor elements
+				"useValidAnchor": "warn"
+			}
+		}
+	},
+	"html": {
+		"formatter": {
+			"enabled": true
+		}
+	},
+	"javascript": {
+		"assist": {
+			"enabled": true
+		},
+		"formatter": {
+			"enabled": true
+		},
+		"linter": {
+			"enabled": true
+		}
+	},
+	"css": {
+		"assist": {
+			"enabled": true
+		},
+		"formatter": {
+			"enabled": true
+		},
+		"linter": {
+			"enabled": true
+		},
+		"parser": {
+			"cssModules": true,
+			"tailwindDirectives": true
+		}
+	}
+}

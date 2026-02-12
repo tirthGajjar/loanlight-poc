@@ -1,0 +1,27 @@
+# Start all services (Postgres + Mailpit)
+up:
+    docker compose up -d
+
+# Stop all services
+down:
+    docker compose down
+
+# Restart all services
+restart:
+    docker compose restart
+
+# View logs (follow mode)
+logs *args:
+    docker compose logs -f {{ args }}
+
+# Start only Postgres
+db:
+    docker compose up -d postgres
+
+# Start only Mailpit
+mail:
+    docker compose up -d mailpit
+
+# Stop and remove volumes (fresh start)
+nuke:
+    docker compose down -v
