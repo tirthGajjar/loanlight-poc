@@ -1,24 +1,15 @@
 "use client";
 
 import {
-	BankIcon,
-	Building03Icon,
 	CloudUploadIcon,
-	CreditCardIcon,
 	DashboardSquare01Icon,
-	DollarSquareIcon,
 	FileSearchIcon,
-	FileValidationIcon,
-	Home01Icon,
 	Settings05Icon,
 	TaskDaily01Icon,
-	TaxesIcon,
-	UserIdVerificationIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
 import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
@@ -90,48 +81,6 @@ const data = {
 			],
 		},
 	],
-	categories: [
-		{
-			name: "Income",
-			url: "/documents?bucket=income",
-			icon: <HugeiconsIcon icon={DollarSquareIcon} strokeWidth={2} />,
-		},
-		{
-			name: "Assets",
-			url: "/documents?bucket=assets",
-			icon: <HugeiconsIcon icon={BankIcon} strokeWidth={2} />,
-		},
-		{
-			name: "Tax Returns",
-			url: "/documents?bucket=tax_returns",
-			icon: <HugeiconsIcon icon={TaxesIcon} strokeWidth={2} />,
-		},
-		{
-			name: "Property",
-			url: "/documents?bucket=property",
-			icon: <HugeiconsIcon icon={Home01Icon} strokeWidth={2} />,
-		},
-		{
-			name: "Credit",
-			url: "/documents?bucket=credit",
-			icon: <HugeiconsIcon icon={CreditCardIcon} strokeWidth={2} />,
-		},
-		{
-			name: "Identity",
-			url: "/documents?bucket=identity",
-			icon: <HugeiconsIcon icon={UserIdVerificationIcon} strokeWidth={2} />,
-		},
-		{
-			name: "Disclosures",
-			url: "/documents?bucket=disclosures",
-			icon: <HugeiconsIcon icon={FileValidationIcon} strokeWidth={2} />,
-		},
-		{
-			name: "Business",
-			url: "/documents?bucket=business",
-			icon: <HugeiconsIcon icon={Building03Icon} strokeWidth={2} />,
-		},
-	],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -150,7 +99,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			</SidebarHeader>
 			<SidebarContent>
 				<NavMain items={data.navMain} />
-				<NavProjects projects={data.categories} />
 			</SidebarContent>
 			<SidebarFooter>
 				<NavUser user={user} />

@@ -39,23 +39,33 @@ async function markJobFailed(jobId: string, error: unknown) {
 
 export const processDocumentTask = task({
 	id: "process-document",
-	maxDuration: 600,
-	run: async (payload: { jobId: string }) => {
-		const { jobId } = payload;
-		console.log(`[process-document] Starting pipeline for job ${jobId}`);
+	maxDuration: 1800,
+	machine: "medium-1x",
+	run: async (payload: {
+		jobId: string;
+		fromStep?: "CLASSIFYING" | "FINALIZING";
+	}) => {
+		const { jobId, fromStep } = payload;
+		console.log(
+			`[process-document] Starting pipeline for job ${jobId}${fromStep ? ` from ${fromStep}` : ""}`,
+		);
 
 		try {
-			// Steps 1-2: Download PDF from S3 + upload to LlamaCloud
-			await updateJobStatus(jobId, "INGESTING");
-			await ingestDocument(jobId);
+			if (!fromStep) {
+				// Steps 1-2: Download PDF from S3 + upload to LlamaCloud
+				await updateJobStatus(jobId, "INGESTING");
+				await ingestDocument(jobId);
 
-			// Step 3: Run LlamaSplit to identify document segments
-			await updateJobStatus(jobId, "SPLITTING");
-			await splitDocument(jobId);
+				// Step 3: Run LlamaSplit to identify document segments
+				await updateJobStatus(jobId, "SPLITTING");
+				await splitDocument(jobId);
+			}
 
-			// Step 4: Classify each segment with LlamaClassify
-			await updateJobStatus(jobId, "CLASSIFYING");
-			await classifySegments(jobId);
+			if (!fromStep || fromStep === "CLASSIFYING") {
+				// Step 4: Classify each segment with LlamaClassify
+				await updateJobStatus(jobId, "CLASSIFYING");
+				await classifySegments(jobId);
+			}
 
 			// Step 5: Extract individual PDFs and upload to S3
 			await updateJobStatus(jobId, "FINALIZING");

@@ -93,9 +93,9 @@ export function UnpublishedBanner() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Publish this version?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Publishing will make this the active version. The current published
-							version will be archived. New classification jobs will use this
-							version.
+							Publishing will make this the active version. The current
+							published version will be archived. New classification jobs will
+							use this version.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

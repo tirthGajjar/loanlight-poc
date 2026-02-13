@@ -13,6 +13,7 @@ interface SourcePdfPanelProps {
 	jobId: string;
 	onClose: () => void;
 	onPageChange?: (page: number) => void;
+	pageRange?: { start: number; end: number } | null;
 }
 
 export function SourcePdfPanel({
@@ -20,13 +21,20 @@ export function SourcePdfPanel({
 	jobId,
 	onClose,
 	onPageChange,
+	pageRange,
 }: SourcePdfPanelProps) {
 	const { data, error, isLoading } = api.pdf.getSourceUrl.useQuery({ jobId });
 
 	return (
 		<div className="flex h-full flex-col rounded-lg border bg-background">
 			<div className="flex items-center justify-between border-b px-4 py-2">
-				<h3 className="font-medium text-sm">Source PDF</h3>
+				<h3 className="font-medium text-sm">
+					{pageRange
+						? pageRange.start === pageRange.end
+							? `Page ${pageRange.start}`
+							: `Pages ${pageRange.start}\u2013${pageRange.end}`
+						: "Source PDF"}
+				</h3>
 				<Button onClick={onClose} size="icon-xs" variant="ghost">
 					<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
 					<span className="sr-only">Close</span>
@@ -39,6 +47,7 @@ export function SourcePdfPanel({
 					<PdfViewer
 						initialPage={initialPage}
 						onPageChange={onPageChange}
+						pageRange={pageRange}
 						totalPages={data.totalPages}
 						url={data.url}
 					/>

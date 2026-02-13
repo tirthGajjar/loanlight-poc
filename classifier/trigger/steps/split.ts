@@ -73,6 +73,7 @@ async function saveSegments(jobId: string, segments: LlamaSplitSegment[]) {
 	const totalPages = Math.max(...allPages);
 
 	await db.$transaction([
+		db.classificationSegment.deleteMany({ where: { jobId } }),
 		db.classificationSegment.createMany({ data }),
 		db.classificationJob.update({
 			data: { totalPages },
@@ -112,7 +113,7 @@ export async function splitDocument(jobId: string): Promise<void> {
 		llamacloud.beta.split.waitForCompletion(splitJob.id, {
 			maxInterval: 5,
 			pollingInterval: 3,
-			timeout: 300,
+			timeout: 1200,
 		}),
 	);
 

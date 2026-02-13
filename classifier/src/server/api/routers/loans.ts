@@ -21,6 +21,8 @@ export const loansRouter = createTRPCRouter({
 				include: {
 					classificationJobs: {
 						orderBy: { createdAt: "desc" },
+						// biome-ignore lint/style/useNamingConvention: Prisma API
+						include: { _count: { select: { segments: true } } },
 					},
 				},
 			});
@@ -33,6 +35,33 @@ export const loansRouter = createTRPCRouter({
 			}
 
 			return loan;
+		}),
+
+	getDocuments: protectedProcedure
+		.input(z.object({ loanId: z.string().cuid() }))
+		.query(async ({ ctx, input }) => {
+			const loan = await ctx.db.loan.findUnique({
+				where: { id: input.loanId },
+			});
+			if (!loan || loan.userId !== ctx.session.user.id) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Loan not found",
+				});
+			}
+
+			const segments = await ctx.db.classificationSegment.findMany({
+				where: {
+					job: { loanId: input.loanId },
+					status: "COMPLETED",
+				},
+				include: {
+					job: { select: { id: true, sourceFileName: true } },
+				},
+				orderBy: [{ encompassFolder: "asc" }, { suggestedFilename: "asc" }],
+			});
+
+			return { loan, segments };
 		}),
 
 	create: protectedProcedure

@@ -14,6 +14,7 @@ interface PdfViewerProps {
 	className?: string;
 	initialPage?: number;
 	onPageChange?: (page: number) => void;
+	pageRange?: { start: number; end: number } | null;
 	totalPages?: number | null;
 	url: string;
 }
@@ -22,6 +23,7 @@ export function PdfViewer({
 	className,
 	initialPage = 1,
 	onPageChange,
+	pageRange,
 	totalPages: externalTotalPages,
 	url,
 }: PdfViewerProps) {
@@ -69,69 +71,59 @@ export function PdfViewer({
 		}
 	}
 
+	const rangePages =
+		pageRange && pageRange.start <= pageRange.end
+			? Array.from(
+					{ length: pageRange.end - pageRange.start + 1 },
+					(_, i) => pageRange.start + i,
+				)
+			: null;
+
 	return (
 		<div className={cn("flex flex-col gap-3", className)}>
 			{/* Toolbar */}
-			<div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
-				<div className="flex items-center gap-1">
-					<Button
-						disabled={pageNumber <= 1}
-						onClick={() => goToPage(pageNumber - 1)}
-						size="xs"
-						variant="outline"
-					>
-						Prev
-					</Button>
-					<div className="flex items-center gap-1 px-1 text-sm">
-						<input
-							className="w-10 rounded border bg-background px-1 py-0.5 text-center text-xs"
-							max={total}
-							min={1}
-							onChange={(e) => {
-								const val = Number.parseInt(e.target.value, 10);
-								if (!Number.isNaN(val)) goToPage(val);
-							}}
-							type="number"
-							value={pageNumber}
-						/>
-						<span className="text-muted-foreground text-xs">/ {total}</span>
-					</div>
-					<Button
-						disabled={pageNumber >= total}
-						onClick={() => goToPage(pageNumber + 1)}
-						size="xs"
-						variant="outline"
-					>
-						Next
-					</Button>
-				</div>
-				<div className="flex items-center gap-1">
-					<Button
-						disabled={scale <= 0.5}
-						onClick={() => setScale((s) => Math.max(0.5, s - 0.25))}
-						size="xs"
-						variant="outline"
-					>
-						-
-					</Button>
-					<span className="min-w-10 text-center text-xs">
-						{Math.round(scale * 100)}%
-					</span>
-					<Button
-						disabled={scale >= 3}
-						onClick={() => setScale((s) => Math.min(3, s + 0.25))}
-						size="xs"
-						variant="outline"
-					>
-						+
-					</Button>
-					{scale !== 1 && (
-						<Button onClick={() => setScale(1)} size="xs" variant="ghost">
-							Reset
+			{!rangePages && (
+				<div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+					<div className="flex items-center gap-1">
+						<Button
+							disabled={pageNumber <= 1}
+							onClick={() => goToPage(pageNumber - 1)}
+							size="xs"
+							variant="outline"
+						>
+							Prev
 						</Button>
-					)}
+						<div className="flex items-center gap-1 px-1 text-sm">
+							<input
+								className="w-10 rounded border bg-background px-1 py-0.5 text-center text-xs"
+								max={total}
+								min={1}
+								onChange={(e) => {
+									const val = Number.parseInt(e.target.value, 10);
+									if (!Number.isNaN(val)) goToPage(val);
+								}}
+								type="number"
+								value={pageNumber}
+							/>
+							<span className="text-muted-foreground text-xs">/ {total}</span>
+						</div>
+						<Button
+							disabled={pageNumber >= total}
+							onClick={() => goToPage(pageNumber + 1)}
+							size="xs"
+							variant="outline"
+						>
+							Next
+						</Button>
+					</div>
+					<ZoomControls scale={scale} setScale={setScale} />
 				</div>
-			</div>
+			)}
+			{rangePages && (
+				<div className="flex items-center justify-end rounded-lg border bg-muted/30 px-3 py-2">
+					<ZoomControls scale={scale} setScale={setScale} />
+				</div>
+			)}
 
 			{/* PDF Content */}
 			<div
@@ -152,16 +144,67 @@ export function PdfViewer({
 					}
 					onLoadSuccess={onDocumentLoadSuccess}
 				>
-					<Page
-						loading={<Skeleton className="h-96 w-full" />}
-						pageNumber={pageNumber}
-						renderAnnotationLayer={false}
-						renderTextLayer={false}
-						scale={scale}
-						width={containerWidth > 0 ? containerWidth : undefined}
-					/>
+					{rangePages ? (
+						rangePages.map((p) => (
+							<Page
+								key={p}
+								loading={<Skeleton className="h-96 w-full" />}
+								pageNumber={p}
+								renderAnnotationLayer={false}
+								renderTextLayer={false}
+								scale={scale}
+								width={containerWidth > 0 ? containerWidth : undefined}
+							/>
+						))
+					) : (
+						<Page
+							loading={<Skeleton className="h-96 w-full" />}
+							pageNumber={pageNumber}
+							renderAnnotationLayer={false}
+							renderTextLayer={false}
+							scale={scale}
+							width={containerWidth > 0 ? containerWidth : undefined}
+						/>
+					)}
 				</Document>
 			</div>
+		</div>
+	);
+}
+
+function ZoomControls({
+	scale,
+	setScale,
+}: {
+	scale: number;
+	setScale: (fn: (s: number) => number) => void;
+}) {
+	return (
+		<div className="flex items-center gap-1">
+			<Button
+				disabled={scale <= 0.5}
+				onClick={() => setScale((s) => Math.max(0.5, s - 0.25))}
+				size="xs"
+				variant="outline"
+			>
+				-
+			</Button>
+			<span className="min-w-10 text-center text-xs">
+				{Math.round(scale * 100)}%
+			</span>
+			<Button
+				disabled={scale >= 3}
+				onClick={() => setScale((s) => Math.min(3, s + 0.25))}
+				size="xs"
+				variant="outline"
+			>
+				+
+			</Button>
+			{scale !== 1 && (
+				<Button onClick={() => setScale(() => 1)} size="xs" variant="ghost">
+					Reset
+				</Button>
+			)}
 		</div>
 	);
 }

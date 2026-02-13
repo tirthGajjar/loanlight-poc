@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudUploadIcon } from "@hugeicons/core-free-icons";
+import { CloudUploadIcon, FolderOpenIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -67,15 +67,24 @@ export function LoanDetail({ loanId }: { loanId: string }) {
 					</h1>
 					<LoanMeta loan={loan} />
 				</div>
-				<Button onClick={() => setUploadOpen(true)}>
-					<HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} />
-					Upload Documents
-					{upload.activeCount > 0 && (
-						<Badge className="ml-1" variant="secondary">
-							{upload.activeCount}
-						</Badge>
-					)}
-				</Button>
+				<div className="flex items-center gap-2">
+					<Button
+						render={<Link href={`/loans/${loanId}/documents`} />}
+						variant="outline"
+					>
+						<HugeiconsIcon icon={FolderOpenIcon} strokeWidth={2} />
+						View Documents
+					</Button>
+					<Button onClick={() => setUploadOpen(true)}>
+						<HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} />
+						Upload Documents
+						{upload.activeCount > 0 && (
+							<Badge className="ml-1" variant="secondary">
+								{upload.activeCount}
+							</Badge>
+						)}
+					</Button>
+				</div>
 			</div>
 			<JobsTable jobs={loan.classificationJobs} />
 			<UploadModal
@@ -145,6 +154,13 @@ function UploadModal({
 
 type Job = RouterOutputs["loans"]["get"]["classificationJobs"][number];
 
+function formatSize(bytes: number | null) {
+	if (!bytes) return "—";
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function JobsTable({ jobs }: { jobs: Job[] }) {
 	if (jobs.length === 0) {
 		return (
@@ -159,15 +175,18 @@ function JobsTable({ jobs }: { jobs: Job[] }) {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Documents</CardTitle>
+				<CardTitle>Uploads</CardTitle>
 			</CardHeader>
 			<CardContent className="p-0">
 				<Table>
 					<TableHeader className="bg-muted/50">
 						<TableRow className="hover:bg-muted/50">
 							<TableHead>File</TableHead>
+							<TableHead className="text-right">Size</TableHead>
+							<TableHead className="text-right">Pages</TableHead>
+							<TableHead className="text-right">Docs Found</TableHead>
 							<TableHead>Status</TableHead>
-							<TableHead className="text-right">Date</TableHead>
+							<TableHead className="text-right">Uploaded</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -177,6 +196,15 @@ function JobsTable({ jobs }: { jobs: Job[] }) {
 									<Link className="hover:underline" href={`/jobs/${job.id}`}>
 										{job.sourceFileName}
 									</Link>
+								</TableCell>
+								<TableCell className="text-right text-muted-foreground">
+									{formatSize(job.sourceSizeBytes)}
+								</TableCell>
+								<TableCell className="text-right text-muted-foreground">
+									{job.totalPages ?? "—"}
+								</TableCell>
+								<TableCell className="text-right text-muted-foreground">
+									{job._count.segments || "—"}
 								</TableCell>
 								<TableCell>
 									<StatusBadge status={job.status} />

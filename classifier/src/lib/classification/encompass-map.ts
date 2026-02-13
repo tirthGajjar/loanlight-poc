@@ -1,3 +1,5 @@
+import { CLASSIFICATION_RULES } from "./rules";
+
 /**
  * Maps document subtypes to their Encompass e-folder paths.
  * Based on the Luxury Mortgage x Ocrolus folder mapping.
@@ -106,3 +108,23 @@ export const ENCOMPASS_FOLDER_MAP: Readonly<Record<string, string>> = {
 	lexis_nexis: "Fraud",
 	compliance_report: "Compliance Report",
 };
+
+/** Reverse lookup: encompassFolder → bucket (uppercase). */
+export const FOLDER_TO_BUCKET: Readonly<Record<string, string>> = (() => {
+	const map: Record<string, string> = {};
+	for (const [bucketKey, rules] of Object.entries(CLASSIFICATION_RULES)) {
+		const bucket = bucketKey.toUpperCase();
+		for (const rule of rules) {
+			const folder = ENCOMPASS_FOLDER_MAP[rule.type];
+			if (folder && !map[folder]) {
+				map[folder] = bucket;
+			}
+		}
+	}
+	return map;
+})();
+
+/** All unique encompass folder names from the mapping. */
+export const ALL_ENCOMPASS_FOLDERS: readonly string[] = [
+	...new Set(Object.values(ENCOMPASS_FOLDER_MAP)),
+].sort();

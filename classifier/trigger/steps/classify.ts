@@ -170,14 +170,28 @@ function buildTargetPages(pageStart: number, pageEnd: number): number[] {
 	);
 }
 
-/** Call LlamaClassify for a single segment and save the result. */
-async function callClassifyAndSave(
-	segment: SegmentInfo,
-	fileId: string,
-	rules: readonly SubtypeRule[],
-): Promise<void> {
-	const targetPages = buildTargetPages(segment.pageStart, segment.pageEnd);
+/** Max pages per MULTIMODAL classify request (LlamaCloud limit). */
+const MULTIMODAL_PAGE_LIMIT = 10;
 
+/** Split an array into chunks of at most `size` elements. */
+function chunk<T>(arr: T[], size: number): T[][] {
+	const chunks: T[][] = [];
+	for (let i = 0; i < arr.length; i += size) {
+		chunks.push(arr.slice(i, i + size));
+	}
+	return chunks;
+}
+
+/** Classify a single batch of pages and return the top result. */
+async function classifyPages(
+	fileId: string,
+	targetPages: number[],
+	rules: readonly SubtypeRule[],
+): Promise<{
+	type: string | null;
+	confidence: number;
+	reasoning: string;
+} | null> {
 	const results = await withLlamaCloudError("classify", () =>
 		llamacloud.classifier.classify(
 			{
@@ -186,16 +200,45 @@ async function callClassifyAndSave(
 					type: r.type,
 					description: r.description,
 				})),
-				parsing_configuration: { target_pages: targetPages },
+				parsing_configuration: { target_pages: targetPages, max_pages: null },
 				mode: "MULTIMODAL",
 			},
 			{ timeout: 300_000 },
 		),
 	);
+	return results.items[0]?.result ?? null;
+}
 
-	const result = results.items[0]?.result;
+/** Call LlamaClassify for a single segment and save the result. */
+async function callClassifyAndSave(
+	segment: SegmentInfo,
+	fileId: string,
+	rules: readonly SubtypeRule[],
+): Promise<void> {
+	const targetPages = buildTargetPages(segment.pageStart, segment.pageEnd);
+	const batches = chunk(targetPages, MULTIMODAL_PAGE_LIMIT);
 
-	if (!result) {
+	// Classify each batch sequentially, keep the highest-confidence result.
+	let best: {
+		type: string | null;
+		confidence: number;
+		reasoning: string;
+	} | null = null;
+
+	for (const batch of batches) {
+		const result = await classifyPages(fileId, batch, rules);
+		if (result && (!best || result.confidence > best.confidence)) {
+			best = result;
+		}
+	}
+
+	if (batches.length > 1 && best) {
+		console.log(
+			`[classify] Segment ${segment.id}: split into ${batches.length} batches, best confidence ${(best.confidence * 100).toFixed(1)}%`,
+		);
+	}
+
+	if (!best) {
 		await markForReview(segment.id);
 		console.log(
 			`[classify] Segment ${segment.id}: no result from LlamaClassify`,
@@ -203,17 +246,17 @@ async function callClassifyAndSave(
 		return;
 	}
 
-	const { level, requiresReview } = getConfidenceLevel(result.confidence);
-	const encompassFolder = result.type
-		? (rules.find((r) => r.type === result.type)?.encompassFolder ?? null)
+	const { level, requiresReview } = getConfidenceLevel(best.confidence);
+	const encompassFolder = best.type
+		? (rules.find((r) => r.type === best.type)?.encompassFolder ?? null)
 		: null;
 
 	await db.classificationSegment.update({
 		where: { id: segment.id },
 		data: {
-			subtype: result.type,
-			confidence: result.confidence,
-			reasoning: result.reasoning,
+			subtype: best.type,
+			confidence: best.confidence,
+			reasoning: best.reasoning,
 			confidenceLevel: level,
 			requiresReview,
 			encompassFolder,
@@ -223,7 +266,7 @@ async function callClassifyAndSave(
 	});
 
 	console.log(
-		`[classify] Segment ${segment.id}: ${result.type} (${(result.confidence * 100).toFixed(1)}%, ${level})`,
+		`[classify] Segment ${segment.id}: ${best.type} (${(best.confidence * 100).toFixed(1)}%, ${level})`,
 	);
 }
 
@@ -305,6 +348,12 @@ async function mapWithConcurrency<T>(
 
 /** Classify all pending segments for a job using LlamaClassify. */
 export async function classifySegments(jobId: string): Promise<void> {
+	// Reset interrupted/failed segments so they get retried
+	await db.classificationSegment.updateMany({
+		where: { jobId, status: { in: ["CLASSIFYING", "FAILED"] } },
+		data: { status: "PENDING", errorMessage: null },
+	});
+
 	const segments = await db.classificationSegment.findMany({
 		select: { id: true, bucket: true, pageStart: true, pageEnd: true },
 		where: { jobId, status: "PENDING" },

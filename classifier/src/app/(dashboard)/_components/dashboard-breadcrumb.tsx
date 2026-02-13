@@ -17,6 +17,7 @@ import { api } from "@/trpc/react";
 const LABELS: Record<string, string> = {
 	categories: "Categories",
 	dashboard: "Dashboard",
+	documents: "Documents",
 	jobs: "Jobs",
 	loans: "Loans",
 	review: "Review Queue",

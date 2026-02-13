@@ -192,10 +192,10 @@ export const jobsRouter = createTRPCRouter({
 			if (!job || job.userId !== ctx.session.user.id) {
 				throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
 			}
-			if (job.status !== "FAILED") {
+			if (job.status !== "FAILED" && job.status !== "CANCELLED") {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
-					message: "Only failed jobs can be retried",
+					message: "Only failed or cancelled jobs can be retried",
 				});
 			}
 
@@ -212,16 +212,118 @@ export const jobsRouter = createTRPCRouter({
 				where: { id: job.id },
 			});
 
-			// Reset failed segments back to PENDING
+			// Reset non-completed segments back to PENDING
 			await ctx.db.classificationSegment.updateMany({
 				data: { errorMessage: null, status: "PENDING" },
-				where: { jobId: job.id, status: "FAILED" },
+				where: { jobId: job.id, status: { not: "COMPLETED" } },
 			});
 
 			// Re-trigger the pipeline
 			try {
 				const handle = await tasks.trigger("process-document", {
 					jobId: job.id,
+				});
+				await ctx.db.classificationJob.update({
+					data: { triggerRunId: handle.id },
+					where: { id: job.id },
+				});
+			} catch {
+				await ctx.db.classificationJob.update({
+					data: {
+						completedAt: new Date(),
+						errorMessage: "Failed to start processing",
+						status: "FAILED",
+					},
+					where: { id: job.id },
+				});
+			}
+
+			return { jobId: job.id };
+		}),
+
+	retryFromStep: protectedProcedure
+		.input(
+			z.object({
+				jobId: z.string().cuid(),
+				fromStep: z.enum(["CLASSIFYING", "FINALIZING"]),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const job = await ctx.db.classificationJob.findUnique({
+				where: { id: input.jobId },
+				include: { segments: { select: { id: true, status: true } } },
+			});
+			if (!job || job.userId !== ctx.session.user.id) {
+				throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+			}
+			if (job.status !== "FAILED" && job.status !== "CANCELLED") {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Only failed or cancelled jobs can be retried",
+				});
+			}
+			if (job.segments.length === 0) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message:
+						"No segments found — use full retry instead (split must complete first)",
+				});
+			}
+
+			// Reset job state
+			await ctx.db.classificationJob.update({
+				data: {
+					completedAt: null,
+					errorMessage: null,
+					retryCount: { increment: 1 },
+					status: "PENDING",
+					triggerRunId: null,
+				},
+				where: { id: job.id },
+			});
+
+			if (input.fromStep === "CLASSIFYING") {
+				// Reset all non-completed segments back to PENDING,
+				// and clear classification results so they get re-classified
+				await ctx.db.classificationSegment.updateMany({
+					data: {
+						errorMessage: null,
+						status: "PENDING",
+						subtype: null,
+						confidence: null,
+						confidenceLevel: null,
+						reasoning: null,
+						requiresReview: false,
+						outputFileKey: null,
+						suggestedFilename: null,
+						encompassFolder: null,
+					},
+					where: {
+						jobId: job.id,
+						status: { not: "COMPLETED" },
+					},
+				});
+			} else {
+				// FINALIZING: clear output keys so finalize re-runs
+				await ctx.db.classificationSegment.updateMany({
+					data: {
+						errorMessage: null,
+						outputFileKey: null,
+						suggestedFilename: null,
+						status: "COMPLETED",
+					},
+					where: {
+						jobId: job.id,
+						status: { not: "COMPLETED" },
+					},
+				});
+			}
+
+			// Re-trigger the pipeline from the specified step
+			try {
+				const handle = await tasks.trigger("process-document", {
+					jobId: job.id,
+					fromStep: input.fromStep,
 				});
 				await ctx.db.classificationJob.update({
 					data: { triggerRunId: handle.id },

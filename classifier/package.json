@@ -63,6 +63,7 @@
 		"@biomejs/biome": "^2.2.5",
 		"@noble/hashes": "^2.0.1",
 		"@tailwindcss/postcss": "^4.0.15",
+		"@trigger.dev/build": "^4.3.3",
 		"@types/archiver": "^7.0.0",
 		"@types/node": "^20.14.10",
 		"@types/nodemailer": "^7.0.9",

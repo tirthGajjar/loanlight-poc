@@ -126,6 +126,9 @@ importers:
       '@tailwindcss/postcss':
         specifier: ^4.0.15
         version: 4.1.18
+      '@trigger.dev/build':
+        specifier: ^4.3.3
+        version: 4.3.3(typescript@5.9.3)
       '@types/archiver':
         specifier: ^7.0.0
         version: 7.0.0
@@ -2073,6 +2076,10 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
+  '@trigger.dev/build@4.3.3':
+    resolution: {integrity: sha512-57U2nb8n9RERqFktmamSqriAgK4+e3985fwYi0EHtQ1/WDmQ0KYdiK0FEGN1ls5/vcZxbyfH/cifIA2fW0vHEg==}
+    engines: {node: '>=18.20.0'}
+
   '@trigger.dev/core@4.3.3':
     resolution: {integrity: sha512-HPPxbesDiEEuA1U/Qi1RWXVMkQNDCNyB7zhd3cIYd6T0KUTIt6i7ZdaqSRDhkAxva2hpaWXQsQIYwr5Jnsyohw==}
     engines: {node: '>=18.20.0'}
@@ -2456,6 +2463,9 @@ packages:
   conf@15.1.0:
     resolution: {integrity: sha512-Uy5YN9KEu0WWDaZAVJ5FAmZoaJt9rdK6kH+utItPyGsCqCgaTKkrmZx3zoE0/3q6S3bcp3Ihkk+ZqPxWxFK5og==}
     engines: {node: '>=20'}
+
+  confbox@0.1.8:
+    resolution: {integrity: sha512-RMtmw0iFkeR4YV+fUOSucriAQNb9g8zFR52MWCtl+cCZOFRNL6zeB395vPzFhEjjn4fMxXudmELnl/KF/WrK6w==}
 
   confbox@0.2.2:
     resolution: {integrity: sha512-1NB+BKqhtNipMsov4xI/NnhCKp9XG9NamYp5PVm9klAT0fsrNPjaFICsCFhNhwZJKNh7zB/3q8qXz0E9oaMNtQ==}
@@ -3437,6 +3447,9 @@ packages:
     resolution: {integrity: sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==}
     engines: {node: '>=16 || 14 >=14.17'}
 
+  mlly@1.8.0:
+    resolution: {integrity: sha512-l8D9ODSRWLe2KHJSifWGwBqpTZXIXTeo8mlKjY+E2HAakaTeNpqAyBZ8GSqLzHgw4XmHmC8whvpjJNMbFZN7/g==}
+
   module-details-from-path@1.0.4:
     resolution: {integrity: sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w==}
 
@@ -3689,6 +3702,9 @@ packages:
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
+
+  pkg-types@1.3.1:
+    resolution: {integrity: sha512-/Jm5M4RvtBFVkKWRu2BLUTNP8/M2a+UwuAX+ae4770q1qVGtfjG+WTCupoZixokjmHiry8uI+dlY8KXYV5HVVQ==}
 
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
@@ -4148,6 +4164,10 @@ packages:
     resolution: {integrity: sha512-W/KYk+NFhkmsYpuHq5JykngiOCnxeVL8v8dFnqxSD8qEEdRfXk1SDM6JzNqcERbcGYj9tMrDQBYV9cjgnunFIg==}
     engines: {node: '>=18'}
 
+  tinyglobby@0.2.15:
+    resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
+
   tlds@1.261.0:
     resolution: {integrity: sha512-QXqwfEl9ddlGBaRFXIvNKK6OhipSiLXuRuLJX5DErz0o0Q0rYxulWLdFryTkV5PkdZct5iMInwYEGe/eR++1AA==}
     hasBin: true
@@ -4176,6 +4196,16 @@ packages:
 
   tsafe@1.8.12:
     resolution: {integrity: sha512-nFRqW0ttu/2o6XTXsHiVZWJBCOaxhVqZLg7dgs3coZNsCMPXPfwz+zPHAQA+70fNnVJLAPg1EgGIqK9Q84tvAw==}
+
+  tsconfck@3.1.3:
+    resolution: {integrity: sha512-ulNZP1SVpRDesxeMLON/LtWM8HIgAJEIVpVVhBM6gsmvQ8+Rh+ZG7FWGvHh7Ah3pRABwVJWklWCr/BTZSv0xnQ==}
+    engines: {node: ^18 || >=20}
+    hasBin: true
+    peerDependencies:
+      typescript: ^5.0.0
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   tsconfig-paths@4.2.0:
     resolution: {integrity: sha512-NoZ4roiN7LnbKn9QqE1amc9DJfzvZXxF4xDavcOWt1BPkdx+m+0gJuPM+S0vCe7zTJMYUP0R8pO2XMr+Y8oLIg==}
@@ -4210,6 +4240,9 @@ packages:
 
   uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}
+
+  ufo@1.6.3:
+    resolution: {integrity: sha512-yDJTmhydvl5lJzBmy/hyOAA0d+aqCBuwl818haVdYCRrWV84o7YyeVm4QlVHStqNrrJSTb6jKuFAVqAFsr+K3Q==}
 
   uint8array-extras@1.5.0:
     resolution: {integrity: sha512-rvKSBiC5zqCCiDZ9kAOszZcDvdAHwwIKJG33Ykj43OKcWsnmcBRL09YTU4nOeHZ8Y2a7l1MgTd08SBe9A8Qj6A==}
@@ -6456,6 +6489,22 @@ snapshots:
       '@tanstack/query-core': 5.90.20
       react: 19.2.4
 
+  '@trigger.dev/build@4.3.3(typescript@5.9.3)':
+    dependencies:
+      '@prisma/config': 6.19.2
+      '@trigger.dev/core': 4.3.3(typescript@5.9.3)
+      mlly: 1.8.0
+      pkg-types: 1.3.1
+      resolve: 1.22.11
+      tinyglobby: 0.2.15
+      tsconfck: 3.1.3(typescript@5.9.3)
+    transitivePeerDependencies:
+      - bufferutil
+      - magicast
+      - supports-color
+      - typescript
+      - utf-8-validate
+
   '@trigger.dev/core@4.3.3(typescript@5.9.3)':
     dependencies:
       '@bugsnag/cuid': 3.2.1
@@ -6850,6 +6899,8 @@ snapshots:
       json-schema-typed: 8.0.2
       semver: 7.7.3
       uint8array-extras: 1.5.0
+
+  confbox@0.1.8: {}
 
   confbox@0.2.2: {}
 
@@ -7783,6 +7834,13 @@ snapshots:
 
   minipass@7.1.2: {}
 
+  mlly@1.8.0:
+    dependencies:
+      acorn: 8.15.0
+      pathe: 2.0.3
+      pkg-types: 1.3.1
+      ufo: 1.6.3
+
   module-details-from-path@1.0.4: {}
 
   motion-dom@12.33.0:
@@ -8025,6 +8083,12 @@ snapshots:
   picomatch@4.0.3: {}
 
   pkce-challenge@5.0.1: {}
+
+  pkg-types@1.3.1:
+    dependencies:
+      confbox: 0.1.8
+      mlly: 1.8.0
+      pathe: 2.0.3
 
   pkg-types@2.3.0:
     dependencies:
@@ -8631,6 +8695,11 @@ snapshots:
 
   tinyexec@1.0.2: {}
 
+  tinyglobby@0.2.15:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+
   tlds@1.261.0: {}
 
   tldts-core@7.0.22: {}
@@ -8655,6 +8724,10 @@ snapshots:
       code-block-writer: 13.0.3
 
   tsafe@1.8.12: {}
+
+  tsconfck@3.1.3(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
 
   tsconfig-paths@4.2.0:
     dependencies:
@@ -8688,6 +8761,8 @@ snapshots:
   typescript@5.9.3: {}
 
   uc.micro@2.1.0: {}
+
+  ufo@1.6.3: {}
 
   uint8array-extras@1.5.0: {}
 
