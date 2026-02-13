@@ -5,10 +5,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { StatusBadge } from "@/components/jobs/status-badge";
+import { UploadsTable } from "@/components/loans/uploads-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogClose,
@@ -18,17 +17,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import { FileUpload } from "@/components/upload/file-upload";
 import { useMultiUpload } from "@/components/upload/use-multi-upload";
-import { api, type RouterOutputs } from "@/trpc/react";
+import { api } from "@/trpc/react";
 
 // Upload state is lifted here (not inside the dialog) because Base UI Dialog
 // unmounts portal content when closed, which would abort active XHR uploads.
@@ -86,7 +77,7 @@ export function LoanDetail({ loanId }: { loanId: string }) {
 					</Button>
 				</div>
 			</div>
-			<JobsTable jobs={loan.classificationJobs} />
+			<UploadsTable jobs={loan.classificationJobs} />
 			<UploadModal
 				hasActive={upload.hasActive}
 				onOpenChange={setUploadOpen}
@@ -149,74 +140,5 @@ function UploadModal({
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
-	);
-}
-
-type Job = RouterOutputs["loans"]["get"]["classificationJobs"][number];
-
-function formatSize(bytes: number | null) {
-	if (!bytes) return "—";
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function JobsTable({ jobs }: { jobs: Job[] }) {
-	if (jobs.length === 0) {
-		return (
-			<Card>
-				<CardContent className="py-8 text-center text-muted-foreground text-sm">
-					No documents uploaded yet
-				</CardContent>
-			</Card>
-		);
-	}
-
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Uploads</CardTitle>
-			</CardHeader>
-			<CardContent className="p-0">
-				<Table>
-					<TableHeader className="bg-muted/50">
-						<TableRow className="hover:bg-muted/50">
-							<TableHead>File</TableHead>
-							<TableHead className="text-right">Size</TableHead>
-							<TableHead className="text-right">Pages</TableHead>
-							<TableHead className="text-right">Docs Found</TableHead>
-							<TableHead>Status</TableHead>
-							<TableHead className="text-right">Uploaded</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{jobs.map((job) => (
-							<TableRow key={job.id}>
-								<TableCell className="font-medium">
-									<Link className="hover:underline" href={`/jobs/${job.id}`}>
-										{job.sourceFileName}
-									</Link>
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground">
-									{formatSize(job.sourceSizeBytes)}
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground">
-									{job.totalPages ?? "—"}
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground">
-									{job._count.segments || "—"}
-								</TableCell>
-								<TableCell>
-									<StatusBadge status={job.status} />
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground">
-									{job.createdAt.toLocaleDateString()}
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-			</CardContent>
-		</Card>
 	);
 }

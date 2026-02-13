@@ -4,6 +4,7 @@ import {
 	ArrowDown01Icon,
 	Download04Icon,
 	Location01Icon,
+	Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useId, useMemo, useState } from "react";
@@ -91,6 +92,20 @@ interface SegmentListProps {
 	segments: Segment[];
 }
 
+/** Check whether the selected segments form a contiguous page range. */
+function areAdjacent(segments: Segment[], selectedIds: Set<string>): boolean {
+	const selected = segments
+		.filter((s) => selectedIds.has(s.id))
+		.sort((a, b) => a.pageStart - b.pageStart);
+	if (selected.length < 2) return false;
+	for (let i = 1; i < selected.length; i++) {
+		const curr = selected[i]!;
+		const prev = selected[i - 1]!;
+		if (curr.pageStart !== prev.pageEnd + 1) return false;
+	}
+	return true;
+}
+
 export function SegmentList({
 	bucketFilter,
 	jobId,
@@ -100,6 +115,34 @@ export function SegmentList({
 }: SegmentListProps) {
 	const [filter, setFilter] = useState<Filter>("all");
 	const [groupBy, setGroupBy] = useState<GroupBy>("bucket");
+	const [selectMode, setSelectMode] = useState(false);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+	const exitSelectMode = useCallback(() => {
+		setSelectMode(false);
+		setSelectedIds(new Set());
+	}, []);
+
+	const toggleSelect = useCallback((id: string, checked: boolean) => {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (checked) {
+				next.add(id);
+			} else {
+				next.delete(id);
+			}
+			return next;
+		});
+	}, []);
+
+	const completedSegments = useMemo(
+		() => segments.filter((s) => s.status === "COMPLETED"),
+		[segments],
+	);
+
+	const selectAll = useCallback(() => {
+		setSelectedIds(new Set(completedSegments.map((s) => s.id)));
+	}, [completedSegments]);
 
 	const bucketFiltered = useMemo(() => {
 		if (!bucketFilter || bucketFilter.size === 0) return segments;
@@ -148,11 +191,50 @@ export function SegmentList({
 			}));
 	}, [filtered, groupBy]);
 
+	const adjacent = useMemo(
+		() => selectedIds.size >= 2 && areAdjacent(segments, selectedIds),
+		[segments, selectedIds],
+	);
+
 	return (
-		<div className="space-y-3">
+		<div className="relative space-y-3">
 			<div className="flex items-center justify-between gap-3">
-				<h2 className="font-medium text-lg">Segments ({filtered.length})</h2>
 				<div className="flex items-center gap-2">
+					<h2 className="font-medium text-lg">
+						Segments ({filtered.length})
+					</h2>
+					{selectMode && (
+						<div className="flex items-center gap-1">
+							<Button onClick={selectAll} size="sm" variant="ghost">
+								Select all
+							</Button>
+							<Button
+								onClick={() => setSelectedIds(new Set())}
+								size="sm"
+								variant="ghost"
+							>
+								Clear
+							</Button>
+						</div>
+					)}
+				</div>
+				<div className="flex items-center gap-2">
+					{completedSegments.length >= 2 && (
+						<Button
+							onClick={() =>
+								selectMode ? exitSelectMode() : setSelectMode(true)
+							}
+							size="sm"
+							variant={selectMode ? "secondary" : "outline"}
+						>
+							<HugeiconsIcon
+								className="size-3.5"
+								icon={Tick02Icon}
+								strokeWidth={2}
+							/>
+							{selectMode ? "Done" : "Select"}
+						</Button>
+					)}
 					<FilterToolbar
 						counts={counts}
 						filter={filter}
@@ -171,7 +253,9 @@ export function SegmentList({
 							key={group.bucket}
 							onLocateInSource={onLocateInSource}
 							onSegmentClick={onSegmentClick}
+							onToggleSelect={selectMode ? toggleSelect : undefined}
 							segments={group.segments}
+							selectedIds={selectMode ? selectedIds : undefined}
 						/>
 					))}
 				</div>
@@ -185,14 +269,86 @@ export function SegmentList({
 								key={seg.id}
 								onLocateInSource={onLocateInSource}
 								onSegmentClick={onSegmentClick}
+								onToggleSelect={selectMode ? toggleSelect : undefined}
 								segment={seg}
+								selected={selectMode ? selectedIds.has(seg.id) : undefined}
 							/>
 						))}
 				</div>
 			)}
+
+			{selectMode && selectedIds.size >= 2 && (
+				<MergeBar
+					adjacent={adjacent}
+					jobId={jobId}
+					onMerged={exitSelectMode}
+					segmentIds={[...selectedIds]}
+					selectedCount={selectedIds.size}
+				/>
+			)}
 		</div>
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Merge bar
+// ---------------------------------------------------------------------------
+
+function MergeBar({
+	adjacent,
+	jobId,
+	onMerged,
+	segmentIds,
+	selectedCount,
+}: {
+	adjacent: boolean;
+	jobId: string;
+	onMerged: () => void;
+	segmentIds: string[];
+	selectedCount: number;
+}) {
+	const utils = api.useUtils();
+	const mutation = api.jobs.mergeSegments.useMutation({
+		onSuccess: () => {
+			utils.jobs.getStatus.invalidate({ jobId });
+			onMerged();
+		},
+	});
+
+	return (
+		<div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-lg border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
+			<span className="text-sm">
+				{selectedCount} segments selected
+				{!adjacent && (
+					<span className="ml-2 text-destructive text-xs">
+						Selected segments must be adjacent
+					</span>
+				)}
+			</span>
+			<div className="flex gap-2">
+				<Button onClick={onMerged} size="sm" variant="ghost">
+					Cancel
+				</Button>
+				<Button
+					disabled={!adjacent || mutation.isPending}
+					onClick={() => mutation.mutate({ jobId, segmentIds })}
+					size="sm"
+				>
+					{mutation.isPending ? "Merging..." : "Merge"}
+				</Button>
+			</div>
+			{mutation.isError && (
+				<span className="text-destructive text-xs">
+					{mutation.error.message}
+				</span>
+			)}
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Toolbar helpers
+// ---------------------------------------------------------------------------
 
 function FilterToolbar({
 	counts,
@@ -259,18 +415,26 @@ function GroupByDropdown({
 	);
 }
 
+// ---------------------------------------------------------------------------
+// Bucket group
+// ---------------------------------------------------------------------------
+
 function BucketGroup({
 	bucket,
 	jobId,
 	onLocateInSource,
 	onSegmentClick,
+	onToggleSelect,
 	segments,
+	selectedIds,
 }: {
 	bucket: string;
 	jobId: string;
 	onLocateInSource?: (pageStart: number) => void;
 	onSegmentClick?: (segment: Segment) => void;
+	onToggleSelect?: (id: string, checked: boolean) => void;
 	segments: Segment[];
+	selectedIds?: Set<string>;
 }) {
 	const color = getBucketColor(bucket);
 
@@ -295,7 +459,9 @@ function BucketGroup({
 							key={seg.id}
 							onLocateInSource={onLocateInSource}
 							onSegmentClick={onSegmentClick}
+							onToggleSelect={onToggleSelect}
 							segment={seg}
+							selected={selectedIds?.has(seg.id)}
 						/>
 					))}
 				</div>
@@ -304,18 +470,28 @@ function BucketGroup({
 	);
 }
 
+// ---------------------------------------------------------------------------
+// Segment row
+// ---------------------------------------------------------------------------
+
 function SegmentRow({
 	jobId,
 	onLocateInSource,
 	onSegmentClick,
+	onToggleSelect,
 	segment: seg,
+	selected,
 }: {
 	jobId: string;
 	onLocateInSource?: (pageStart: number) => void;
 	onSegmentClick?: (segment: Segment) => void;
+	onToggleSelect?: (id: string, checked: boolean) => void;
 	segment: Segment;
+	selected?: boolean;
 }) {
 	const [editing, setEditing] = useState(false);
+
+	const showCheckbox = onToggleSelect && seg.status === "COMPLETED";
 
 	return (
 		<div className="group relative">
@@ -336,6 +512,11 @@ function SegmentRow({
 				manuallyClassified={seg.manuallyClassified}
 				onClick={onSegmentClick ? () => onSegmentClick(seg) : undefined}
 				onEdit={() => setEditing((v) => !v)}
+				onSelect={
+					showCheckbox
+						? (checked: boolean) => onToggleSelect(seg.id, checked)
+						: undefined
+				}
 				originalBucket={seg.originalBucket}
 				originalSubtype={seg.originalSubtype}
 				pageEnd={seg.pageEnd}
@@ -343,6 +524,7 @@ function SegmentRow({
 				reasoning={seg.reasoning}
 				requiresReview={seg.requiresReview}
 				segmentIndex={seg.segmentIndex}
+				selected={selected}
 				status={seg.status}
 				subtype={seg.subtype}
 				suggestedFilename={seg.suggestedFilename}
@@ -375,6 +557,10 @@ function SegmentRow({
 		</div>
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Inline correction form
+// ---------------------------------------------------------------------------
 
 function InlineCorrectionForm({
 	jobId,
@@ -508,6 +694,10 @@ function InlineCorrectionForm({
 		</div>
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Download button
+// ---------------------------------------------------------------------------
 
 function DownloadButton({
 	jobId,

@@ -27,6 +27,7 @@ interface SegmentCardProps {
 	manuallyClassified?: boolean;
 	onClick?: () => void;
 	onEdit?: () => void;
+	onSelect?: (checked: boolean) => void;
 	originalBucket: string | null;
 	originalSubtype: string | null;
 	pageEnd: number;
@@ -34,6 +35,7 @@ interface SegmentCardProps {
 	reasoning: string | null;
 	requiresReview: boolean;
 	segmentIndex: number;
+	selected?: boolean;
 	status: string;
 	subtype: string | null;
 	suggestedFilename: string | null;
@@ -51,6 +53,7 @@ export function SegmentCard({
 	manuallyClassified,
 	onClick,
 	onEdit,
+	onSelect,
 	originalBucket,
 	originalSubtype,
 	pageEnd,
@@ -58,6 +61,7 @@ export function SegmentCard({
 	reasoning,
 	requiresReview,
 	segmentIndex,
+	selected,
 	status,
 	subtype,
 	suggestedFilename,
@@ -88,8 +92,21 @@ export function SegmentCard({
 		>
 			<CardContent className="flex items-start justify-between gap-4">
 				<div className="min-w-0 space-y-1">
-					{/* Row 1: Status dot, index, subtype headline */}
+					{/* Row 1: Checkbox (if select mode), status dot, index, subtype headline */}
 					<div className="flex items-center gap-2">
+						{onSelect && (
+							<input
+								aria-label={`Select segment #${segmentIndex}`}
+								checked={selected ?? false}
+								className="size-4 shrink-0 cursor-pointer rounded border-muted-foreground/40 accent-primary"
+								onChange={(e) => {
+									e.stopPropagation();
+									onSelect(e.target.checked);
+								}}
+								onClick={(e) => e.stopPropagation()}
+								type="checkbox"
+							/>
+						)}
 						<SegmentStatusDot status={status} />
 						<span className="text-muted-foreground text-xs">
 							#{segmentIndex}

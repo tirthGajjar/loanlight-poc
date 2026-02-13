@@ -1,11 +1,12 @@
-import { HeadObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { runs, tasks } from "@trigger.dev/sdk";
 import { TRPCError } from "@trpc/server";
+import { PDFDocument } from "pdf-lib";
 import { z } from "zod";
 
 import { ENCOMPASS_FOLDER_MAP } from "@/lib/classification/encompass-map";
 import { CLASSIFICATION_RULES } from "@/lib/classification/rules";
-import { S3_BUCKET, s3 } from "@/server/s3";
+import { S3_BUCKET, s3, uploadToS3 } from "@/server/s3";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const createInput = z.object({
@@ -385,6 +386,132 @@ export const jobsRouter = createTRPCRouter({
 			});
 
 			return { jobId: job.id };
+		}),
+
+	mergeSegments: protectedProcedure
+		.input(
+			z.object({
+				jobId: z.string().cuid(),
+				segmentIds: z.array(z.string().cuid()).min(2).max(50),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// 1. Validate job ownership
+			const job = await ctx.db.classificationJob.findUnique({
+				where: { id: input.jobId },
+			});
+			if (!job || job.userId !== ctx.session.user.id) {
+				throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+			}
+
+			// 2. Fetch all segments, verify they belong to job and are COMPLETED
+			const segments = await ctx.db.classificationSegment.findMany({
+				where: { id: { in: input.segmentIds }, jobId: input.jobId },
+			});
+			if (segments.length !== input.segmentIds.length) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "One or more segments not found in this job",
+				});
+			}
+			const nonCompleted = segments.find((s) => s.status !== "COMPLETED");
+			if (nonCompleted) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "All segments must be completed before merging",
+				});
+			}
+
+			// 3. Sort by pageStart, validate adjacency
+			const sorted = [...segments].sort((a, b) => a.pageStart - b.pageStart);
+			for (let i = 1; i < sorted.length; i++) {
+				const curr = sorted[i]!;
+				const prev = sorted[i - 1]!;
+				if (curr.pageStart !== prev.pageEnd + 1) {
+					throw new TRPCError({
+						code: "BAD_REQUEST",
+						message: "Selected segments must be adjacent (no page gaps)",
+					});
+				}
+			}
+
+			// 4. Compute merged range — sorted has at least 2 elements (input.segmentIds.min(2))
+			const first = sorted[0]!;
+			const last = sorted[sorted.length - 1]!;
+			const mergedPageStart = first.pageStart;
+			const mergedPageEnd = last.pageEnd;
+			const deleteIds = sorted.slice(1).map((s) => s.id);
+
+			// 5. Download source PDF from S3 and extract merged pages
+			const res = await s3.send(
+				new GetObjectCommand({
+					Bucket: S3_BUCKET,
+					Key: job.sourceFileKey,
+				}),
+			);
+			if (!res.Body) throw new Error("Empty S3 response body");
+			const fileBytes = await res.Body.transformToByteArray();
+			const sourcePdf = await PDFDocument.load(fileBytes);
+
+			const output = await PDFDocument.create();
+			const indices = Array.from(
+				{ length: mergedPageEnd - mergedPageStart + 1 },
+				(_, i) => mergedPageStart - 1 + i,
+			);
+			const pages = await output.copyPages(sourcePdf, indices);
+			for (const page of pages) {
+				output.addPage(page);
+			}
+			const pdfBytes = await output.save();
+
+			// 6. Build filename and upload to S3
+			const idx = String(first.segmentIndex).padStart(3, "0");
+			const label = first.subtype
+				? first.subtype.toUpperCase()
+				: "UNKNOWN";
+			const filename = `${idx}_${label}.pdf`;
+			const outputKey = `outputs/${job.loanId}/${job.id}/${filename}`;
+			await uploadToS3(outputKey, new Uint8Array(pdfBytes), "application/pdf");
+
+			// 7. Transaction: update keeper, delete absorbed, reindex
+			await ctx.db.$transaction(async (tx) => {
+				// Update the first segment with merged range + new output
+				await tx.classificationSegment.update({
+					where: { id: first.id },
+					data: {
+						pageEnd: mergedPageEnd,
+						outputFileKey: outputKey,
+						suggestedFilename: filename,
+					},
+				});
+
+				// Delete absorbed segments
+				await tx.classificationSegment.deleteMany({
+					where: { id: { in: deleteIds } },
+				});
+
+				// Reindex: two-step to avoid unique constraint violations
+				// (PG checks unique row-by-row during UPDATE, not at statement end)
+				// Step 1: negate all indices to move them out of conflict range
+				await tx.$executeRaw`
+					UPDATE classification_segments
+					SET "segmentIndex" = -"segmentIndex"
+					WHERE "jobId" = ${input.jobId}
+				`;
+				// Step 2: assign correct sequential indices
+				await tx.$executeRaw`
+					UPDATE classification_segments
+					SET "segmentIndex" = sub.new_index
+					FROM (
+						SELECT id, ROW_NUMBER() OVER (ORDER BY "pageStart" ASC)::int AS new_index
+						FROM classification_segments
+						WHERE "jobId" = ${input.jobId}
+					) sub
+					WHERE classification_segments.id = sub.id
+				`;
+			});
+
+			return { mergedSegmentId: first.id };
 		}),
 
 	updateSegment: protectedProcedure
